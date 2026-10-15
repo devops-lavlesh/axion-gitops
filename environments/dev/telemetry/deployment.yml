@@ -1,0 +1,60 @@
+
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: telemetry
+  namespace: default
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: telemetry
+
+  template:
+    metadata:
+      labels:
+        app: telemetry
+        azure.workload.identity/use: "true"
+
+    spec:
+      serviceAccountName: axion-kv-sa
+
+      containers:
+        - name: telemetry
+          image: luckacr2026.azurecr.io/axion-telemetry-query-service:0d2ebcd07431468615e3860f23489cad86effa14
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8000
+
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: telemetry-db-url
+                  key: DATABASE_URL
+
+          volumeMounts:
+            - name: secrets-store
+              mountPath: /mnt/secrets-store
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: axion-kv-secrets
